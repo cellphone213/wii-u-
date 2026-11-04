@@ -41,6 +41,7 @@ def _cli(argv: list[str]) -> int:
     d.add_argument("model", nargs="?", default=models.DEFAULT_MODEL, choices=list(models.MODELS))
     d.add_argument("--repo", default=None)
     sub.add_parser("selftest")
+    sub.add_parser("download-gpu", help="download NVIDIA libraries for GPU translation (Windows)")
     t = sub.add_parser("test-translate")
     t.add_argument("text")
     t.add_argument("--source", default="en")
@@ -65,6 +66,18 @@ def _cli(argv: list[str]) -> int:
 
         path = models.install(a.model, prog, token=s.hf_token or None, repo=a.repo)
         print(f"\ninstalled to {path} from {models.installed_info(a.model).get('repo')}")
+        return 0
+
+    if a.cmd == "download-gpu":
+        from .translators import cuda
+
+        def gprog(name, done, total):
+            print(f"\r{name}: {done // 2**20} / {total // 2**20} MB", end="", flush=True)
+
+        path = cuda.install(gprog)
+        print(f"\ninstalled to {path}:", *sorted(p.name for p in path.glob("*.dll")))
+        errors = cuda.add_to_path()
+        print("preload:", "ok" if not errors else errors)
         return 0
 
     if a.cmd == "test-translate":

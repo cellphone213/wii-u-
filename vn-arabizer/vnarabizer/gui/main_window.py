@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
         self.engine: Engine | None = None
         self.project: Project | None = None
         self.job: Job | None = None
+        self._gpu_declined = False
         self.pool = QThreadPool.globalInstance()
 
         self.setWindowTitle(f"{APP_NAME} {__version__} — معرّب الروايات المرئية")
@@ -354,6 +355,8 @@ class MainWindow(QMainWindow):
         if not ok:
             QMessageBox.information(self, "المترجم غير جاهز", msg)
             return
+        if tid == "nllb" and self._offer_gpu_download():
+            return
         source = self.cmb_source.currentData()
         s.source_language = source
         s.save()
@@ -375,6 +378,13 @@ class MainWindow(QMainWindow):
             )
             if getattr(translator, "device", None):
                 job.signals.log.emit(f"الجهاز المستخدم: {translator.device}")
+            problem = getattr(translator, "gpu_problem", "")
+            if problem == "missing_libs":
+                job.signals.log.emit("كرت الشاشة لم يُستخدم لأن مكتباته غير منزّلة: الإعدادات ← «تنزيل دعم كرت الشاشة».")
+            elif problem:
+                job.signals.log.emit(
+                    "كرت الشاشة لم يُستخدم: " + problem + "\nحدّث تعريف NVIDIA (يحتاج إصداراً يدعم CUDA 12) ثم أعد المحاولة."
+                )
             translator.close()
             return st
 
@@ -454,7 +464,33 @@ class MainWindow(QMainWindow):
 
         self._start(work, done, "تنزيل النموذج")
 
-    def download_gpu(self) -> None:
+    def _offer_gpu_download(self) -> bool:
+        """If an NVIDIA card is present but its libraries are not, offer to get them.
+
+        Returns True when a download was started (translation resumes after it).
+        """
+        if sys.platform != "win32" or self.settings.device == "cpu" or self._gpu_declined or cuda.installed():
+            return False
+        if not cuda.gpu_present():
+            return False
+        box = QMessageBox(self)
+        box.setWindowTitle("كرت الشاشة")
+        box.setText(
+            "وجدتُ كرت شاشة NVIDIA. لتسريع الترجمة عليه يحتاج البرنامج مكتبات NVIDIA (~550MB، مرة واحدة فقط).\n"
+            "بدونها تعمل الترجمة على المعالج، لكنها أبطأ بكثير."
+        )
+        dl = box.addButton("تنزيل الآن ثم الترجمة", QMessageBox.AcceptRole)
+        cpu = box.addButton("متابعة على المعالج", QMessageBox.RejectRole)
+        box.setDefaultButton(dl)
+        box.exec()
+        if box.clickedButton() is dl:
+            self.download_gpu(then=self.translate)
+            return True
+        if box.clickedButton() is cpu:
+            self._gpu_declined = True
+        return False
+
+    def download_gpu(self, then=None) -> None:
         def work(job: Job):
             def prog(name, done, total):
                 job.signals.progress.emit(done // 1024, max(1, total // 1024), f"{name}: {_mb(done)} / {_mb(total)}")
@@ -464,7 +500,12 @@ class MainWindow(QMainWindow):
             except Cancelled:
                 raise RuntimeError("cancelled")
 
-        self._start(work, lambda p: self.log(f"✓ نُزّلت مكتبات كرت الشاشة إلى {p}"), "تنزيل دعم كرت الشاشة")
+        def done(p):
+            self.log(f"✓ نُزّلت مكتبات كرت الشاشة إلى {p}")
+            if then:
+                QTimer.singleShot(0, then)
+
+        self._start(work, done, "تنزيل دعم كرت الشاشة")
 
     def open_settings(self) -> None:
         dlg = SettingsDialog(self.settings, self, on_gpu_download=lambda: QTimer.singleShot(0, self.download_gpu))

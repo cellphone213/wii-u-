@@ -40,6 +40,8 @@ class NLLBTranslator(Translator):
         self._translator = None
         self._sp = None
         self.device = None
+        #: Set when an NVIDIA card exists but could not be used (shown to the user).
+        self.gpu_problem = ""
         self._lock = threading.Lock()
 
     def ready(self) -> tuple[bool, str]:
@@ -53,7 +55,8 @@ class NLLBTranslator(Translator):
         ok, msg = self.ready()
         if not ok:
             raise TranslatorError(msg)
-        cuda.add_to_path()
+        for err in cuda.add_to_path():
+            self.log(f"GPU library: {err}")
         try:
             import ctranslate2
             import sentencepiece as spm
@@ -82,6 +85,10 @@ class NLLBTranslator(Translator):
                 return
             except Exception as e:
                 last = e
+                if device == "cuda" and not self.gpu_problem:
+                    self.gpu_problem = (
+                        "missing_libs" if ("cublas" in str(e).lower() or "cudart" in str(e).lower()) and not cuda.installed() else str(e)
+                    )
                 self.log(f"NLLB: {device}/{ctype} not available: {e}")
         raise TranslatorError(f"could not load the model: {last}")
 

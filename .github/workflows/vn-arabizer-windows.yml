@@ -56,6 +56,12 @@ jobs:
           .\dist\VNArabizer\vnarabizer-cli.exe test-translate "今日はいい天気ですね。一緒に帰りませんか？" --source ja --model nllb-600m
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: GPU libraries download and load (runner has no GPU; informational)
+        continue-on-error: true
+        run: |
+          .\dist\VNArabizer\vnarabizer-cli.exe download-gpu
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Translate a demo Ren'Py game end to end
         run: |
           python tools/make_demo_game.py "$env:RUNNER_TEMP\DemoGame"

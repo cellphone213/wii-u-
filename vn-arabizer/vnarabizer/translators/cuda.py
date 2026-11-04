@@ -31,16 +31,47 @@ def installed() -> bool:
 
 
 _added = False
+_loaded: list[object] = []  # keep handles alive for the life of the process
+
+# Load order matters: cuBLAS needs cuBLASLt, which needs the CUDA runtime.
+PRELOAD = ("cudart64_*.dll", "cublasLt64_*.dll", "cublas64_*.dll")
 
 
-def add_to_path() -> None:
-    """Make the downloaded DLLs visible to CTranslate2 (call before importing it)."""
+def add_to_path() -> list[str]:
+    """Make the downloaded DLLs available to CTranslate2 (call before loading a model).
+
+    Besides adding the folder to the search path, each DLL is loaded by its
+    full path. CTranslate2 asks Windows for "cublas64_12.dll" by name, and a
+    DLL that is already loaded is always found, whatever the search rules.
+    Returns any load errors (empty list means everything loaded).
+    """
     global _added
+    errors: list[str] = []
     if _added or sys.platform != "win32" or not installed():
-        return
-    os.add_dll_directory(str(cuda_dir()))
-    os.environ["PATH"] = str(cuda_dir()) + os.pathsep + os.environ.get("PATH", "")
+        return errors
+    d = cuda_dir()
+    os.add_dll_directory(str(d))
+    os.environ["PATH"] = str(d) + os.pathsep + os.environ.get("PATH", "")
+    import ctypes
+
+    for pattern in PRELOAD:
+        for dll in sorted(d.glob(pattern)):
+            try:
+                _loaded.append(ctypes.WinDLL(str(dll)))
+            except OSError as e:
+                errors.append(f"{dll.name}: {e}")
     _added = True
+    return errors
+
+
+def gpu_present() -> bool:
+    """True if an NVIDIA GPU with a working driver is visible to CTranslate2."""
+    try:
+        import ctranslate2
+
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
 
 
 def _wheel_url(package: str) -> tuple[str, str, int]:
