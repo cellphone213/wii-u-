@@ -1,0 +1,83 @@
+name: VN Arabizer – Windows build
+
+on:
+  push:
+    paths:
+      - "vn-arabizer/**"
+      - ".github/workflows/vn-arabizer-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: vn-arabizer
+        shell: pwsh
+    env:
+      VNARABIZER_HOME: ${{ github.workspace }}\vna-home
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pytest
+
+      - name: Unit tests
+        run: python -m pytest -q tests
+
+      - name: Build app folder
+        run: pyinstaller packaging/vnarabizer.spec --noconfirm
+
+      - name: Self-test of the built app
+        run: .\dist\VNArabizer\vnarabizer-cli.exe selftest
+
+      - name: Cache offline model
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\vna-home\models
+          key: nllb-600m-v1
+
+      - name: Download NLLB model and translate test sentences
+        run: |
+          .\dist\VNArabizer\vnarabizer-cli.exe download-model nllb-600m
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .\dist\VNArabizer\vnarabizer-cli.exe test-translate "The sun was setting over the quiet town." --source en --model nllb-600m
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .\dist\VNArabizer\vnarabizer-cli.exe test-translate "今日はいい天気ですね。一緒に帰りませんか？" --source ja --model nllb-600m
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Translate a demo Ren'Py game end to end
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\DemoGame"
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\DemoGame" --engine nllb --model nllb-600m --source en --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-Content "$env:RUNNER_TEMP\DemoGame\game\vnarabizer\say.json" -Encoding utf8
+          Get-Content "$env:RUNNER_TEMP\DemoGame\game\tl\arabic\vnarabizer_strings.rpy" -Encoding utf8
+          if (-not (Test-Path "$env:RUNNER_TEMP\DemoGame\game\zz_vnarabizer.rpy")) { exit 1 }
+
+      - name: Build installer
+        run: |
+          $ver = python -c "import vnarabizer; print(vnarabizer.__version__)"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DAppVersion=$ver" packaging\installer.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-ChildItem dist\*.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VNArabizer-Setup
+          path: vn-arabizer/dist/VNArabizer-Setup-*.exe
+          if-no-files-found: error
