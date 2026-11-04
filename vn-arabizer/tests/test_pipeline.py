@@ -76,12 +76,45 @@ def test_translations_feed_the_patch(tmp_path):
     assert p.translations() == {("say", "Hello"): "عربي Hello"}
 
 
-def test_punctuation_around_tags_is_kept(tmp_path):
+def test_names_stay_inside_whole_sentences(tmp_path):
     p = make_project(tmp_path, ["Hello, [player]! Welcome to {b}Ren'Py{/b}."])
     t = FakeAR(keeps=False)
     pipeline.run(p, t, source="en")
     out = p.rows()[0].translation
     sent = [x for _, batch in t.calls for x in batch]
-    assert "Hello" in sent and "Welcome to" in sent  # only words go to the translator
-    assert "عربي Hello، [player]! عربي Welcome to {b}" in out
-    assert out.endswith("{/b}.")
+    # The variable travels inside the sentence as a number; formatting tags split it.
+    assert "Hello, 7301! Welcome to" in sent and "Ren'Py" in sent
+    assert out == "عربي Hello, [player]! Welcome to {b}عربي Ren'Py{/b}."
+
+
+class DropsNumbers(FakeAR):
+    def translate(self, texts, source, target="ar"):
+        import re
+
+        self.calls.append((source, list(texts)))
+        return ["عربي " + re.sub(r"\d+", "", t) for t in texts]
+
+
+def test_fallback_when_translator_loses_the_name(tmp_path):
+    p = make_project(tmp_path, ["Hello, [player]! Ready?"])
+    pipeline.run(p, DropsNumbers(keeps=False), source="en")
+    row = p.rows()[0]
+    assert row.status == "machine"
+    assert row.translation.count("[player]") == 1
+
+
+def test_japanese_codes_get_spaces_in_arabic(tmp_path):
+    p = make_project(tmp_path, ["\\C[2]こんにちは、\\N[1]さん！\n今日は\\V[3]ゴールドだ。"])
+    p.markup = "rpgm"
+
+    class Echo(FakeAR):
+        def translate(self, texts, source, target="ar"):
+            self.calls.append((source, list(texts)))
+            # Pretend translation that keeps the numbers, like NLLB does.
+            return [t.replace("こんにちは、", "مرحبا، ").replace("さん！今日は", "! اليوم لديك ").replace("ゴールドだ。", " ذهب.") for t in texts]
+
+    t = Echo(keeps=False)
+    pipeline.run(p, t, source="ja")
+    out = p.rows()[0].translation
+    assert t.calls[0][1] == ["こんにちは、7301さん！今日は7318ゴールドだ。"]
+    assert out == "\\C[2]مرحبا، \\N[1]! اليوم لديك \\V[3] ذهب."

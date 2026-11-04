@@ -309,3 +309,56 @@ def split_edges(piece: str) -> tuple[str, str, str]:
 
 def arabic_punct(s: str) -> str:
     return s.translate(_AR_PUNCT)
+
+
+# Markup that stands for a word in the sentence (a name, a number). These are
+# swapped for numbers while translating so the sentence stays whole and the
+# translator puts the word where it belongs in Arabic.
+_WORD_TOKEN = {
+    "renpy": re.compile(r"^\[[^\[\]]+\]$|^%\(\w+\)[sd]$|^%[sd]$"),
+    "rpgm": re.compile(r"^\\[NnPpVv]\[\d+\]$|^\\[Gg]$"),
+}
+_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def is_word_token(tok: str, syntax: str) -> bool:
+    # Glossary terms are inserted as tokens too; they contain no markup at all.
+    return bool(_WORD_TOKEN[syntax].match(tok)) or not SYNTAXES[syntax].fullmatch(tok)
+
+
+def sentinelize(m: Masked) -> tuple[str, dict[str, int]]:
+    """Body with word-like placeholders replaced by unique numbers."""
+    used = set(re.findall(r"\d+", m.original))
+    smap: dict[str, int] = {}
+    n = [7301]
+
+    def rep(match):
+        i = int(match.group(1))
+        if not is_word_token(m.tokens[i], m.syntax):
+            return match.group(0)
+        while str(n[0]) in used:
+            n[0] += 17
+        s = str(n[0])
+        used.add(s)
+        smap[s] = i
+        n[0] += 17
+        return s
+
+    return _PLACEHOLDER_RE.sub(rep, m.body), smap
+
+
+def desentinelize(text: str, smap: dict[str, int]) -> str | None:
+    """Put placeholders back for the numbers; None if any number was lost or doubled."""
+    if not smap:
+        return text
+    t = text.translate(_DIGITS)
+    for s, i in smap.items():
+        pat = re.compile(r"(?<!\d)" + s + r"(?!\d)")
+        if len(pat.findall(t)) != 1:
+            return None
+        t = pat.sub(_PLACEHOLDER.format(i), t)
+    return t
+
+
+def is_cjk(ch: str) -> bool:
+    return bool(_CJK.match(ch))

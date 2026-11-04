@@ -145,24 +145,62 @@ def _translate_items(items, lang, translator: Translator, project: Project, cach
             continue
         _store(project, r, final, translator, stats)
 
-    # 2) Piece-by-piece: translate prose between markup separately so every
-    #    tag and variable stays exactly where it was.
+    # 2) Lines with markup inside the sentence. Names and numbers become plain
+    #    numbers so the sentence is translated whole; formatting codes split
+    #    it into pieces. If the translator loses a number, fall back to
+    #    translating every piece between markup separately.
     if pieces:
-        cores = [protect.split_edges(s.strip())[1] for _, m in pieces for s in protect.segments(m) if s.strip()]
-        segs = list(dict.fromkeys(c for c in cores if c and (lang, c) not in cache))
-        if segs:
-            for src, dst in zip(segs, translator.translate(segs, lang)):
-                cache[(lang, src)] = dst
-        for r, m in pieces:
-            translated = []
-            for s in protect.segments(m):
-                if not s.strip():
-                    translated.append(s)
-                    continue
-                lead, core, trail = protect.split_edges(s.strip())
-                tr = cache.get((lang, core), core) if core else ""
-                translated.append(protect.arabic_punct(lead) + tr + protect.arabic_punct(trail))
-            _store(project, r, protect.join_segments(m, translated), translator, stats)
+        failed = _translate_pieces(pieces, lang, translator, project, cache, stats, sentinels=True)
+        if failed:
+            _translate_pieces(failed, lang, translator, project, cache, stats, sentinels=False)
+
+
+def _translate_pieces(items, lang, translator: Translator, project: Project, cache, stats: RunStats, sentinels: bool):
+    prepared = []
+    for r, m in items:
+        body, smap = protect.sentinelize(m) if sentinels else (m.body, {})
+        parts = protect._PLACEHOLDER_RE.split(body)  # even: prose, odd: placeholder index
+        prepared.append((r, m, parts, smap))
+
+    cores = [protect.split_edges(p.strip())[1] for _, _, parts, _ in prepared for p in parts[0::2] if p.strip()]
+    todo = list(dict.fromkeys(c for c in cores if c and (lang, c) not in cache))
+    if todo:
+        for src, dst in zip(todo, translator.translate(todo, lang)):
+            cache[(lang, src)] = dst
+
+    failed = []
+    for r, m, parts, smap in prepared:
+        out = []
+        last = len(parts) - 1
+        for k, part in enumerate(parts):
+            if k % 2:
+                out.append(protect._PLACEHOLDER.format(part))
+                continue
+            if not part.strip():
+                out.append(part)
+                continue
+            text = part.strip()
+            lead_ws = part[: len(part) - len(part.lstrip())]
+            trail_ws = part[len(part.rstrip()) :]
+            lead, core, trail = protect.split_edges(text)
+            tr = cache.get((lang, core), core) if core else ""
+            # Japanese/Chinese put no spaces around names and codes; Arabic needs them.
+            if not lead_ws and k > 0 and not lead and protect.is_cjk(text[0]):
+                lead_ws = " "
+            if not trail_ws and k < last and protect.is_cjk(text[-1]):
+                trail_ws = " "
+            out.append(lead_ws + protect.arabic_punct(lead) + tr + protect.arabic_punct(trail) + trail_ws)
+        body = protect.desentinelize("".join(out), smap)
+        if body is None:
+            failed.append((r, m))
+            continue
+        try:
+            final = protect.unmask(m, body)
+        except protect.RestoreError:
+            failed.append((r, m))
+            continue
+        _store(project, r, final, translator, stats)
+    return failed
 
 
 def _store(project: Project, r: Row, final: str, translator: Translator, stats: RunStats) -> None:
