@@ -151,7 +151,7 @@ class RenPyEngine(Engine):
         progress("Writing dialogue table", 0.2)
         write(f"{DATA_DIR}/say.json", say_json(say))
         progress("Writing interface strings", 0.4)
-        write(f"tl/{lang}/vnarabizer_strings.rpy", strings_rpy(strings, lang).encode("utf-8"))
+        write(f"tl/{lang}/vnarabizer_strings.rpy", strings_rpy(strings, lang, self.options.align_right).encode("utf-8"))
         progress("Copying Arabic font", 0.6)
         fonts = assets_dir() / "fonts"
         for name in ("VNArabic-Regular.ttf", "VNArabic-Bold.ttf", "OFL.txt"):

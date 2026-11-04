@@ -138,6 +138,7 @@ def test_apply_and_remove(game):
     assert say["The sun was setting."] == "كانت الشمس تغرب."
     rpy = (g / "tl" / "arabic" / "vnarabizer_strings.rpy").read_text("utf-8")
     assert "translate arabic strings:" in rpy
+    assert "translate arabic style say_dialogue:\n    text_align 1.0" in rpy
     assert 'new "ابدأ \\"اللعبة\\""' in rpy
     assert (g / "vnarabizer" / "VNArabic-Regular.ttf").exists()
     main = (g / "zz_vnarabizer.rpy").read_text("utf-8")

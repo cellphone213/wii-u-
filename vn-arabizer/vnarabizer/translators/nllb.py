@@ -116,6 +116,11 @@ class NLLBTranslator(Translator):
                 if toks and toks[0] == TARGET:
                     toks = toks[1:]
                 out_pieces.append(self._sp.decode(toks).strip())
+        # NLLB tends to wrap lone names in brackets: "Eileen" -> "(ايلين)".
+        out_pieces = [
+            p[1:-1].strip() if p.startswith("(") and p.endswith(")") and not src.lstrip().startswith("(") else p
+            for p, src in zip(out_pieces, pieces)
+        ]
         out = [""] * len(texts)
         for owner, piece in zip(owners, out_pieces):
             out[owner] = (out[owner] + " " + piece).strip()

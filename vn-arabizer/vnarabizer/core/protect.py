@@ -239,3 +239,28 @@ def _unbalanced(s: str) -> bool:
     s = re.sub(r"\{[^{}]*\}", "", s)
     s = re.sub(r"\[[^\[\]]*\]", "", s)
     return "{" in s or "[" in s
+
+
+_EDGE_LEAD = re.compile(r"^[\s!?.,;:…\-–—\"'“”«»()]+")
+_EDGE_TRAIL = re.compile(r"[\s!?.,;:…\-–—\"'“”«»()]+$")
+_AR_PUNCT = str.maketrans({",": "،", "?": "؟", ";": "؛"})
+
+
+def split_edges(piece: str) -> tuple[str, str, str]:
+    """Split a prose piece into (leading punctuation, words, trailing punctuation).
+
+    Machine translators often drop punctuation from short fragments such as
+    "! Welcome to " between two tags; translating only the words and keeping
+    the punctuation ourselves preserves the sentence shape.
+    """
+    m1 = _EDGE_LEAD.match(piece)
+    lead = m1.group(0) if m1 else ""
+    rest = piece[len(lead) :]
+    m2 = _EDGE_TRAIL.search(rest)
+    trail = m2.group(0) if m2 else ""
+    core = rest[: len(rest) - len(trail)]
+    return lead, core, trail
+
+
+def arabic_punct(s: str) -> str:
+    return s.translate(_AR_PUNCT)

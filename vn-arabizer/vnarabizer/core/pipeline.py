@@ -147,12 +147,20 @@ def _translate_items(items, lang, translator: Translator, project: Project, cach
     # 2) Piece-by-piece: translate prose between markup separately so every
     #    tag and variable stays exactly where it was.
     if pieces:
-        segs = list(dict.fromkeys(s.strip() for _, m in pieces for s in protect.segments(m) if s.strip() and (lang, s.strip()) not in cache))
+        cores = [protect.split_edges(s.strip())[1] for _, m in pieces for s in protect.segments(m) if s.strip()]
+        segs = list(dict.fromkeys(c for c in cores if c and (lang, c) not in cache))
         if segs:
             for src, dst in zip(segs, translator.translate(segs, lang)):
                 cache[(lang, src)] = dst
         for r, m in pieces:
-            translated = [cache.get((lang, s.strip()), s) if s.strip() else s for s in protect.segments(m)]
+            translated = []
+            for s in protect.segments(m):
+                if not s.strip():
+                    translated.append(s)
+                    continue
+                lead, core, trail = protect.split_edges(s.strip())
+                tr = cache.get((lang, core), core) if core else ""
+                translated.append(protect.arabic_punct(lead) + tr + protect.arabic_punct(trail))
             _store(project, r, protect.join_segments(m, translated), translator, stats)
 
 

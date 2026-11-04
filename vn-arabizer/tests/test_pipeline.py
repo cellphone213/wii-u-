@@ -74,3 +74,14 @@ def test_translations_feed_the_patch(tmp_path):
     p = make_project(tmp_path, ["Hello"])
     pipeline.run(p, FakeAR(), source="en")
     assert p.translations() == {("say", "Hello"): "عربي Hello"}
+
+
+def test_punctuation_around_tags_is_kept(tmp_path):
+    p = make_project(tmp_path, ["Hello, [player]! Welcome to {b}Ren'Py{/b}."])
+    t = FakeAR(keeps=False)
+    pipeline.run(p, t, source="en")
+    out = p.rows()[0].translation
+    sent = [x for _, batch in t.calls for x in batch]
+    assert "Hello" in sent and "Welcome to" in sent  # only words go to the translator
+    assert "عربي Hello، [player]! عربي Welcome to {b}" in out
+    assert out.endswith("{/b}.")
