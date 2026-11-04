@@ -6,8 +6,9 @@ from pathlib import Path
 
 from .base import Engine, Entry
 from .renpy import RenPyEngine
+from .rpgm import RPGMakerEngine
 
-ENGINES: list[type[Engine]] = [RenPyEngine]
+ENGINES: list[type[Engine]] = [RenPyEngine, RPGMakerEngine]
 
 
 def detect(path: str | Path) -> Engine | None:

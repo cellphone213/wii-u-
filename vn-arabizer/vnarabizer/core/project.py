@@ -84,6 +84,19 @@ class Project:
         r = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
         return json.loads(r[0]) if r else default
 
+    @property
+    def markup(self) -> str:
+        """Which engine markup the text uses (see core.protect.SYNTAXES)."""
+        if not hasattr(self, "_markup"):
+            self._markup = self.get_meta("markup", "renpy")
+        return self._markup
+
+    @markup.setter
+    def markup(self, value: str) -> None:
+        self._markup = value
+        self.set_meta("markup", value)
+        self.db.commit()
+
     # -- entries ------------------------------------------------------------
     def merge_entries(self, entries: Iterable[Entry]) -> tuple[int, int]:
         """Add newly extracted strings; keep existing translations. Returns (added, total)."""

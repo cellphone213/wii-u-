@@ -89,7 +89,7 @@ class LinesModel(QAbstractTableModel):
             return False
         r = self.rows[index.row()]
         text = str(value)
-        problems = protect.validate(r.original, text) if text.strip() else []
+        problems = protect.validate(r.original, text, self.project.markup) if text.strip() else []
         status = "error" if problems else ("edited" if text.strip() else "new")
         self.project.set_translation(r.id, text, status, "; ".join(problems), "manual")
         self.project.commit()

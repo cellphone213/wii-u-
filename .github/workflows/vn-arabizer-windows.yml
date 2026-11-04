@@ -71,6 +71,16 @@ jobs:
           Get-Content "$env:RUNNER_TEMP\DemoGame\game\tl\arabic\vnarabizer_strings.rpy" -Encoding utf8
           if (-not (Test-Path "$env:RUNNER_TEMP\DemoGame\game\zz_vnarabizer.rpy")) { exit 1 }
 
+      - name: Translate a demo RPG Maker MV game end to end
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\RpgDemo" mv
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\RpgDemo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python -c "import json,sys; m=json.load(open(sys.argv[1],encoding='utf-8')); print('\n'.join(c['parameters'][0] for c in m['events'][1]['pages'][0]['list'] if c['code']==401))" "$env:RUNNER_TEMP\RpgDemo\www\data\Map001.json"
+          Get-Content "$env:RUNNER_TEMP\RpgDemo\www\js\plugins.js" -Tail 1
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\RpgDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Build installer
         run: |
           $ver = python -c "import vnarabizer; print(vnarabizer.__version__)"

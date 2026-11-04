@@ -108,6 +108,20 @@ def check(path: Path) -> None:
         print(f"  {label}: {status}")
 
 
+def write_widths(path: Path) -> None:
+    """Advance widths (per 1000 em) used to wrap RPG Maker message lines."""
+    import json
+
+    f = TTFont(str(path))
+    cmap = f.getBestCmap()
+    hmtx = f["hmtx"]
+    upm = f["head"].unitsPerEm
+    widths = {str(cp): round(hmtx[g][0] * 1000 / upm) for cp, g in cmap.items()}
+    out = path.with_suffix(".widths.json")
+    out.write_text(json.dumps(widths, separators=(",", ":")), "utf-8")
+    print(out, len(widths), "glyph widths")
+
+
 if __name__ == "__main__":
     noto = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/usr/share/fonts/truetype/noto")
     OUT.mkdir(parents=True, exist_ok=True)
@@ -115,3 +129,5 @@ if __name__ == "__main__":
         p = build(noto, style)
         print(p, p.stat().st_size // 1024, "KB")
         check(p)
+        if style == "Regular":
+            write_widths(p)

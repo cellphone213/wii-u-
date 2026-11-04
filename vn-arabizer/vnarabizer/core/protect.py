@@ -33,6 +33,42 @@ _RENPY_TOKEN = re.compile(
     re.VERBOSE,
 )
 
+# RPG Maker MV/MZ message codes: \V[1] \N[2] \C[3] \I[64] \G \. \| \! \{ \}
+# plus plugin codes (\FS[24], \n<Name>), plugin tags (<WordWrap>) and the
+# %1 placeholders used in system messages.
+_RPGM_TOKEN = re.compile(
+    r"""
+      \\[A-Za-z]+\[[^\]\n]*\]          # \C[2] \V[10] \FS[24]
+    | \\[A-Za-z]+<[^>\n]*>                # \n<Name> (message plugins)
+    | \\[A-Za-z]+                         # \G and other letter codes
+    | \\[$.|^!><{}\\]                     # \. \| \! \> \< \^ \{ \} \\ \$
+    | <[A-Za-z/!][^<>\n]{0,60}>            # plugin tags such as <WordWrap>, <br>
+    | %\d+                                 # %1 in system messages
+    """,
+    re.VERBOSE,
+)
+
+SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN}
+
+_CJK = re.compile(r"[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]")
+
+
+def _join_lines(text: str) -> str:
+    """RPG Maker message boxes are hard-wrapped; the engine plugin re-wraps.
+
+    Joins the original lines so the translator sees whole sentences
+    (no space between Japanese/Chinese lines, a space otherwise).
+    """
+    lines = text.split("\n")
+    out = lines[0]
+    for nxt in lines[1:]:
+        if out and nxt and _CJK.match(out[-1]) and _CJK.match(nxt[0]):
+            out += nxt
+        else:
+            out += " " + nxt
+    return out
+
+
 # Tags that are pure formatting around the whole line; they are peeled off
 # and re-attached so the translator sees clean prose.
 _PLACEHOLDER = "⟦{}⟧"  # ⟦0⟧
@@ -55,7 +91,7 @@ _COLOR = re.compile(r"^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 _NUMBERISH = re.compile(r"^[\s\d.,:;+\-*/%()=<>!?#]*$")
 
 
-def untranslatable_reason(text: str) -> str | None:
+def untranslatable_reason(text: str, syntax: str = "renpy") -> str | None:
     """Return why ``text`` must be left alone, or None if it is prose.
 
     This is the guard that stops things like ``eileen happy.png`` or
@@ -76,13 +112,13 @@ def untranslatable_reason(text: str) -> str | None:
     # ("Yes", "Hmm...") are allowed through.
     if _IDENTIFIER.match(s):
         return "identifier"
-    if not _strip_markup(s).strip():
+    if not _strip_markup(s, syntax).strip():
         return "markup only"
     return None
 
 
-def _strip_markup(text: str) -> str:
-    return _RENPY_TOKEN.sub("", text)
+def _strip_markup(text: str, syntax: str = "renpy") -> str:
+    return SYNTAXES[syntax].sub("", text)
 
 
 @dataclass
@@ -94,17 +130,21 @@ class Masked:
     suffix: str  # trailing tokens + trailing whitespace, kept verbatim
     body: str  # prose with ⟦n⟧ placeholders for inner tokens
     tokens: list[str] = field(default_factory=list)
+    syntax: str = "renpy"
 
     @property
     def needs_translation(self) -> bool:
         return bool(_PLACEHOLDER_RE.sub("", self.body).strip())
 
 
-def mask(text: str) -> Masked:
+def mask(text: str, syntax: str = "renpy") -> Masked:
     """Split ``text`` into verbatim edges and a placeholder-marked body."""
+    original = text
+    if syntax == "rpgm":
+        text = _join_lines(text)
     pieces: list[tuple[bool, str]] = []  # (is_token, text)
     pos = 0
-    for m in _RENPY_TOKEN.finditer(text):
+    for m in SYNTAXES[syntax].finditer(text):
         if m.start() > pos:
             pieces.append((False, text[pos : m.start()]))
         pieces.append((True, m.group(0)))
@@ -141,11 +181,15 @@ def mask(text: str) -> Masked:
         else:
             body_parts.append(s)
 
-    return Masked(text, "".join(prefix_parts), "".join(suffix_parts), "".join(body_parts), tokens)
+    return Masked(original, "".join(prefix_parts), "".join(suffix_parts), "".join(body_parts), tokens, syntax)
 
 
-def _escape_prose(s: str) -> str:
-    """Make translator output safe to show literally in Ren'Py."""
+def _escape_prose(s: str, syntax: str = "renpy") -> str:
+    """Make translator output safe to show literally in the engine."""
+    if syntax == "rpgm":
+        # A stray backslash would start an escape code; "\\" shows one backslash.
+        s = s.replace("\\", "\\\\")
+        return re.sub(r"\s*\n\s*", " ", s)
     s = s.replace("{", "{{").replace("[", "[[")
     # A lone % can be read as a format code; the Arabic percent sign cannot.
     s = s.replace("%", "٪")
@@ -168,10 +212,10 @@ def unmask(masked: Masked, translated_body: str) -> str:
     out: list[str] = []
     pos = 0
     for m in _PLACEHOLDER_RE.finditer(translated_body):
-        out.append(_escape_prose(translated_body[pos : m.start()]))
+        out.append(_escape_prose(translated_body[pos : m.start()], masked.syntax))
         out.append(masked.tokens[int(m.group(1))])
         pos = m.end()
-    out.append(_escape_prose(translated_body[pos:]))
+    out.append(_escape_prose(translated_body[pos:], masked.syntax))
     body = "".join(out).strip()
     return masked.prefix + body + masked.suffix
 
@@ -198,7 +242,7 @@ def join_segments(masked: Masked, translated_segments: list[str]) -> str:
                 # Keep the spacing the original had around this piece.
                 lead = p[: len(p) - len(p.lstrip())]
                 trail = p[len(p.rstrip()) :]
-                out.append(lead + _escape_prose(src.strip()) + trail)
+                out.append(lead + _escape_prose(src.strip(), masked.syntax) + trail)
             else:
                 out.append(p)
         else:
@@ -207,15 +251,16 @@ def join_segments(masked: Masked, translated_segments: list[str]) -> str:
     return masked.prefix + body + masked.suffix
 
 
-def validate(original: str, translated: str) -> list[str]:
+def validate(original: str, translated: str, syntax: str = "renpy") -> list[str]:
     """Return a list of problems; empty means the line is safe to write."""
     problems: list[str] = []
     if not translated.strip():
         problems.append("empty translation")
-    a = Counter(_RENPY_TOKEN.findall(original))
-    b = Counter(_RENPY_TOKEN.findall(translated))
+    rx = SYNTAXES[syntax]
+    a = Counter(rx.findall(original))
+    b = Counter(rx.findall(translated))
     # Escapes we add ourselves are allowed to appear.
-    for k in ("{{", "[["):
+    for k in ("{{", "[[", "\\\\"):
         b.pop(k, None)
         a.pop(k, None)
     if a != b:
@@ -225,7 +270,7 @@ def validate(original: str, translated: str) -> list[str]:
             problems.append("missing markup: " + " ".join(sorted(missing)))
         if extra:
             problems.append("unexpected markup: " + " ".join(sorted(extra)))
-    if _unbalanced(translated):
+    if syntax == "renpy" and _unbalanced(translated):
         problems.append("unbalanced { } or [ ]")
     return problems
 

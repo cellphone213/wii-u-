@@ -96,6 +96,7 @@ def _cli(argv: list[str]) -> int:
         return 0
 
     project = Project(eng.root, private=a.private)
+    project.markup = eng.markup
     if a.cmd in ("extract", "translate") or not project.stats()["total"]:
         added, total = project.merge_entries(eng.extract())
         print(f"{total} lines ({added} new)")

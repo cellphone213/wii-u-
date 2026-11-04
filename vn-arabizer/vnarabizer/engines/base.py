@@ -38,6 +38,8 @@ class Entry:
 
 class Engine(ABC):
     name: str = "?"
+    #: Markup syntax of the game's text (key of core.protect.SYNTAXES).
+    markup: str = "renpy"
 
     def __init__(self, root: Path):
         self.root = Path(root)

@@ -47,12 +47,12 @@ def _apply_glossary(m: protect.Masked, glossary: dict[str, str]) -> protect.Mask
     return m
 
 
-def _suspicious(original: str, translated: str) -> str:
+def _suspicious(original: str, translated: str, syntax: str = "renpy") -> str:
     """Cheap checks for typical machine-translation failures."""
-    plain = protect._strip_markup(translated)
+    plain = protect._strip_markup(translated, syntax)
     if not _ARABIC.search(plain) and re.search(r"[A-Za-z぀-ヿ一-鿿]", plain):
         return "no Arabic in output"
-    if len(plain) > 6 * max(8, len(protect._strip_markup(original))):
+    if len(plain) > 6 * max(8, len(protect._strip_markup(original, syntax))):
         return "output much longer than input"
     if re.search(r"(.{3,})\1{3,}", plain):
         return "repeated words"
@@ -72,6 +72,7 @@ def run(
     rows = rows if rows is not None else project.pending()
     rows = [r for r in rows if r.status != "locked"]
     glossary = project.glossary()
+    syntax = project.markup
     total = len(rows)
     done = 0
 
@@ -83,7 +84,7 @@ def run(
             stats.translated += 1
             done += 1
             continue
-        m = _apply_glossary(protect.mask(r.original), glossary)
+        m = _apply_glossary(protect.mask(r.original, syntax), glossary)
         if not m.needs_translation:
             project.set_translation(r.id, "", "locked", "nothing to translate", "")
             stats.skipped += 1
@@ -165,11 +166,12 @@ def _translate_items(items, lang, translator: Translator, project: Project, cach
 
 
 def _store(project: Project, r: Row, final: str, translator: Translator, stats: RunStats) -> None:
-    problems = protect.validate(r.original, final)
+    syntax = project.markup
+    problems = protect.validate(r.original, final, syntax)
     if problems:
         project.set_translation(r.id, final, "error", "; ".join(problems), translator.id)
         stats.errors += 1
         return
-    warn = _suspicious(r.original, final)
+    warn = _suspicious(r.original, final, syntax)
     project.set_translation(r.id, final, "machine", warn, translator.id)
     stats.translated += 1

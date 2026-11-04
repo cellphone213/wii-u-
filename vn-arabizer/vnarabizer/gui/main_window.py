@@ -291,6 +291,13 @@ class MainWindow(QMainWindow):
             self.job.cancel()
             self.log("جارٍ الإيقاف…")
 
+    def _apply_engine_options(self, eng: Engine) -> None:
+        opts = getattr(eng, "options", None)  # Ren'Py patch options; other engines have none
+        if opts is not None:
+            opts.align_right = self.settings.align_right
+            opts.force_language = self.settings.force_language
+            opts.replace_fonts = self.settings.replace_fonts
+
     # ------------------------------------------------------------------ actions
     def choose_game(self) -> None:
         d = QFileDialog.getExistingDirectory(self, "اختر مجلد اللعبة", self.settings.last_game or str(Path.home()))
@@ -303,17 +310,16 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "محرك غير مدعوم",
-                "لم أتعرف على محرك هذه اللعبة. حالياً يدعم البرنامج Ren'Py، والمحركات الأخرى قادمة.\n"
-                "تأكد أنك اخترت المجلد الرئيسي للعبة (الذي فيه مجلد game).",
+                "لم أتعرف على محرك هذه اللعبة. حالياً يدعم البرنامج Ren'Py وRPG Maker MV/MZ، والمحركات الأخرى قادمة.\n"
+                "تأكد أنك اخترت المجلد الرئيسي للعبة (الذي فيه ملف التشغيل).",
             )
             return
         if self.project:
             self.project.close()
         self.engine = eng
-        self.engine.options.align_right = self.settings.align_right
-        self.engine.options.force_language = self.settings.force_language
-        self.engine.options.replace_fonts = self.settings.replace_fonts
+        self._apply_engine_options(eng)
         self.project = Project(eng.root, private=self.settings.private_mode)
+        self.project.markup = eng.markup
         self.model.project = self.project
         self.model.reload()
         self.game_label.setText(f"🎮 {eng.root.name} — {eng.describe()}" + ("  · وضع التخفي" if self.settings.private_mode else ""))
@@ -400,9 +406,7 @@ class MainWindow(QMainWindow):
 
     def apply_patch(self) -> None:
         eng, project = self.engine, self.project
-        eng.options.align_right = self.settings.align_right
-        eng.options.force_language = self.settings.force_language
-        eng.options.replace_fonts = self.settings.replace_fonts
+        self._apply_engine_options(eng)
         stats = project.stats()
         if stats["error"]:
             self.log(f"تنبيه: {stats['error']} سطر فيه خطأ وسيبقى بلغته الأصلية.")
@@ -415,12 +419,15 @@ class MainWindow(QMainWindow):
 
         def done(files):
             self.log("✓ طُبّق التعريب. الملفات المضافة:\n  " + "\n  ".join(files))
-            self.log("ملفات اللعبة الأصلية لم تُعدَّل. للتراجع اضغط «إزالة التعريب».")
+            if eng.markup == "rpgm":
+                self.log("نُسخت ملفات اللعبة الأصلية إلى مجلد vnarabizer_backup. «إزالة التعريب» يرجعها كما كانت تماماً.")
+            else:
+                self.log("ملفات اللعبة الأصلية لم تُعدَّل. للتراجع اضغط «إزالة التعريب».")
 
         self._start(work, done, "تطبيق التعريب")
 
     def remove_patch(self) -> None:
-        if QMessageBox.question(self, "إزالة التعريب", "حذف ملفات التعريب من مجلد اللعبة؟ (ترجماتك تبقى محفوظة في البرنامج)") != QMessageBox.Yes:
+        if QMessageBox.question(self, "إزالة التعريب", "إزالة التعريب وإرجاع اللعبة كما كانت؟ (ترجماتك تبقى محفوظة في البرنامج)") != QMessageBox.Yes:
             return
         removed = self.engine.remove()
         self.log("✓ أُزيل التعريب: " + ", ".join(removed))
@@ -428,7 +435,11 @@ class MainWindow(QMainWindow):
 
     def run_game(self) -> None:
         root = self.engine.root
-        exes = [p for p in root.glob("*.exe") if not p.stem.endswith("-32")] if sys.platform == "win32" else []
+        exes = []
+        if sys.platform == "win32":
+            skip = ("-32", "helper", "crash", "unins", "setup", "dxwebsetup", "vcredist")
+            exes = [p for p in root.glob("*.exe") if not any(k in p.stem.lower() for k in skip)]
+            exes.sort(key=lambda p: (p.stem.lower() != "game", p.stem.lower() != root.name.lower(), p.name))
         if sys.platform == "win32" and exes:
             os.startfile(str(exes[0]))  # type: ignore[attr-defined]
         else:
