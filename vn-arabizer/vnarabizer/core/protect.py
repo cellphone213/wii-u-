@@ -49,6 +49,22 @@ _RPGM_TOKEN = re.compile(
 )
 
 SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN}
+# Twine markup needs a real tokenizer (nested quotes, multi-line macros).
+TWINE = ("sugarcube", "harlowe")
+# Entities our own escaping produces for Twine prose.
+_TWINE_ESCAPES = {"&lt;", "&#36;", "&#91;", "&#93;", "&#40;", "&amp;"} | {f"&#{ord(p[0])};" for p in ("''", "//", "__", "~~", "^^", "==", "**", "@@")}
+
+
+def token_spans(text: str, syntax: str) -> list[tuple[int, int]]:
+    if syntax in TWINE:
+        from . import twine_markup
+
+        return twine_markup.spans(text, syntax)
+    return [m.span() for m in SYNTAXES[syntax].finditer(text)]
+
+
+def find_tokens(text: str, syntax: str) -> list[str]:
+    return [text[a:b] for a, b in token_spans(text, syntax)]
 
 _CJK = re.compile(r"[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]")
 
@@ -118,7 +134,12 @@ def untranslatable_reason(text: str, syntax: str = "renpy") -> str | None:
 
 
 def _strip_markup(text: str, syntax: str = "renpy") -> str:
-    return SYNTAXES[syntax].sub("", text)
+    out, pos = [], 0
+    for a, b in token_spans(text, syntax):
+        out.append(text[pos:a])
+        pos = b
+    out.append(text[pos:])
+    return "".join(out)
 
 
 @dataclass
@@ -144,11 +165,11 @@ def mask(text: str, syntax: str = "renpy") -> Masked:
         text = _join_lines(text)
     pieces: list[tuple[bool, str]] = []  # (is_token, text)
     pos = 0
-    for m in SYNTAXES[syntax].finditer(text):
-        if m.start() > pos:
-            pieces.append((False, text[pos : m.start()]))
-        pieces.append((True, m.group(0)))
-        pos = m.end()
+    for a, b in token_spans(text, syntax):
+        if a > pos:
+            pieces.append((False, text[pos:a]))
+        pieces.append((True, text[a:b]))
+        pos = b
     if pos < len(text):
         pieces.append((False, text[pos:]))
 
@@ -186,6 +207,10 @@ def mask(text: str, syntax: str = "renpy") -> Masked:
 
 def _escape_prose(s: str, syntax: str = "renpy") -> str:
     """Make translator output safe to show literally in the engine."""
+    if syntax in TWINE:
+        from . import twine_markup
+
+        return twine_markup.escape_prose(s)
     if syntax == "rpgm":
         # A stray backslash would start an escape code; "\\" shows one backslash.
         s = s.replace("\\", "\\\\")
@@ -256,11 +281,10 @@ def validate(original: str, translated: str, syntax: str = "renpy") -> list[str]
     problems: list[str] = []
     if not translated.strip():
         problems.append("empty translation")
-    rx = SYNTAXES[syntax]
-    a = Counter(rx.findall(original))
-    b = Counter(rx.findall(translated))
+    a = Counter(find_tokens(original, syntax))
+    b = Counter(find_tokens(translated, syntax))
     # Escapes we add ourselves are allowed to appear.
-    for k in ("{{", "[[", "\\\\"):
+    for k in ("{{", "[[", "\\\\") if syntax not in TWINE else tuple(_TWINE_ESCAPES):
         b.pop(k, None)
         a.pop(k, None)
     if a != b:
@@ -314,7 +338,7 @@ def arabic_punct(s: str) -> str:
 # Markup that stands for a word in the sentence (a name, a number). These are
 # swapped for numbers while translating so the sentence stays whole and the
 # translator puts the word where it belongs in Arabic.
-_WORD_TOKEN = {
+_WORD_TOKEN: dict = {
     "renpy": re.compile(r"^\[[^\[\]]+\]$|^%\(\w+\)[sd]$|^%[sd]$"),
     "rpgm": re.compile(r"^\\[NnPpVv]\[\d+\]$|^\\[Gg]$"),
 }
@@ -323,7 +347,13 @@ _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890
 
 def is_word_token(tok: str, syntax: str) -> bool:
     # Glossary terms are inserted as tokens too; they contain no markup at all.
-    return bool(_WORD_TOKEN[syntax].match(tok)) or not SYNTAXES[syntax].fullmatch(tok)
+    if token_spans(tok, syntax) != [(0, len(tok))]:
+        return True
+    if syntax in TWINE:
+        from . import twine_markup
+
+        return twine_markup.is_value_token(tok)
+    return bool(_WORD_TOKEN[syntax].match(tok))
 
 
 def sentinelize(m: Masked) -> tuple[str, dict[str, int]]:

@@ -310,7 +310,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "محرك غير مدعوم",
-                "لم أتعرف على محرك هذه اللعبة. حالياً يدعم البرنامج Ren'Py وRPG Maker MV/MZ، والمحركات الأخرى قادمة.\n"
+                "لم أتعرف على محرك هذه اللعبة. حالياً يدعم البرنامج Ren'Py وRPG Maker MV/MZ وألعاب Twine (HTML)، والمحركات الأخرى قادمة.\n"
                 "تأكد أنك اخترت المجلد الرئيسي للعبة (الذي فيه ملف التشغيل).",
             )
             return
@@ -419,7 +419,7 @@ class MainWindow(QMainWindow):
 
         def done(files):
             self.log("✓ طُبّق التعريب. الملفات المضافة:\n  " + "\n  ".join(files))
-            if eng.markup == "rpgm":
+            if eng.markup in ("rpgm", "sugarcube", "harlowe"):
                 self.log("نُسخت ملفات اللعبة الأصلية إلى مجلد vnarabizer_backup. «إزالة التعريب» يرجعها كما كانت تماماً.")
             else:
                 self.log("ملفات اللعبة الأصلية لم تُعدَّل. للتراجع اضغط «إزالة التعريب».")

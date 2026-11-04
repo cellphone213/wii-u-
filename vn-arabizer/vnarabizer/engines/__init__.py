@@ -7,14 +7,20 @@ from pathlib import Path
 from .base import Engine, Entry
 from .renpy import RenPyEngine
 from .rpgm import RPGMakerEngine
+from .twine import TwineEngine
 
-ENGINES: list[type[Engine]] = [RenPyEngine, RPGMakerEngine]
+ENGINES: list[type[Engine]] = [RenPyEngine, RPGMakerEngine, TwineEngine]
 
 
 def detect(path: str | Path) -> Engine | None:
     """Return an engine instance for the game at ``path``, or None if unknown."""
     p = Path(path)
     if p.is_file():
+        # A Twine game can be picked as its HTML file directly.
+        if p.suffix.lower() in (".html", ".htm"):
+            inst = TwineEngine.detect(p)
+            if inst is not None:
+                return inst
         p = p.parent
     for cls in ENGINES:
         inst = cls.detect(p)

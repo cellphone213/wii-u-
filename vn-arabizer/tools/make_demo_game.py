@@ -1,6 +1,6 @@
 """Create small fake games for smoke tests.
 
-Usage: python tools/make_demo_game.py <folder> [renpy|mv|mz]
+Usage: python tools/make_demo_game.py <folder> [renpy|mv|mz|sugarcube|harlowe]
 """
 
 import sys
@@ -18,8 +18,12 @@ if kind == "renpy":
     (root / "renpy").mkdir(exist_ok=True)
     (root / "renpy" / "vc_version.py").write_text("version = '8.3.7.25031702'\n")
     (root / "game" / "script.rpyc").write_bytes(rpyc_bytes(sample_script("cslots")))
-else:
+elif kind in ("mv", "mz"):
     from fake_rpgm import make_game
 
     make_game(root, mz=(kind == "mz"))
+else:
+    from fake_twine import make_twine
+
+    make_twine(root, "Harlowe" if kind == "harlowe" else "SugarCube")
 print(f"{kind} demo game at {root}")

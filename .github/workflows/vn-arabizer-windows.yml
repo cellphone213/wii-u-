@@ -81,6 +81,15 @@ jobs:
           .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\RpgDemo"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Translate a demo Twine (SugarCube) game end to end
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\TwineDemo" sugarcube
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\TwineDemo" --engine nllb --model nllb-600m --source en --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python -c "import html,re,sys; d=open(sys.argv[1],encoding='utf-8').read(); print(html.unescape(re.search(r'name=.Start.[^>]*>(.*?)</tw-passagedata>', d, re.S).group(1)))" "$env:RUNNER_TEMP\TwineDemo\Test Game.html"
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\TwineDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Build installer
         run: |
           $ver = python -c "import vnarabizer; print(vnarabizer.__version__)"
