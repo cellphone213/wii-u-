@@ -118,3 +118,16 @@ def test_japanese_codes_get_spaces_in_arabic(tmp_path):
     out = p.rows()[0].translation
     assert t.calls[0][1] == ["こんにちは、7301さん！今日は7318ゴールドだ。"]
     assert out == "\\C[2]مرحبا، \\N[1]! اليوم لديك \\V[3] ذهب."
+
+
+def test_common_menu_words_use_the_dictionary(tmp_path):
+    from vnarabizer.engines.base import Entry
+
+    p = Project(tmp_path, private=True)
+    p.merge_entries([Entry("strings", "Load", "ui"), Entry("say", "Load the cargo.", "dialogue"), Entry("choice", "はい", "menu")])
+    t = FakeAR()
+    pipeline.run(p, t, source="auto")
+    rows = {r.original: r for r in p.rows()}
+    assert rows["Load"].translation == "تحميل" and rows["Load"].engine == "dictionary"
+    assert rows["はい"].translation == "نعم"
+    assert rows["Load the cargo."].translation == "عربي Load the cargo."  # dialogue still goes to the translator

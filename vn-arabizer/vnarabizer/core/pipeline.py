@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from ..translators.base import Translator, TranslatorError, guess_language
-from . import protect
+from . import protect, ui_terms
 from .project import Project, Row
 
 Progress = Callable[[int, int, str], None]  # (done, total, message)
@@ -81,6 +81,12 @@ def run(
     for r in rows:
         if r.original in glossary:
             project.set_translation(r.id, glossary[r.original], "edited", "", "glossary")
+            stats.translated += 1
+            done += 1
+            continue
+        fixed = ui_terms.lookup(r.original) if r.kind in ("ui", "menu") else None
+        if fixed:
+            project.set_translation(r.id, fixed, "machine", "", "dictionary")
             stats.translated += 1
             done += 1
             continue

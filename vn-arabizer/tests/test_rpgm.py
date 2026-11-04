@@ -78,7 +78,7 @@ def test_translate_apply_and_remove(game):
     # Untouched commands are byte-identical.
     assert {"code": 355, "indent": 0, "parameters": ["$gameVariables.setValue(1, 'こんにちは')"]} in lst
     choices = next(c for c in lst if c["code"] == 102)["parameters"][0]
-    assert all("عربي" in c for c in choices)
+    assert choices == ["نعم", "لا"]  # common words come from the built-in dictionary
     assert m["note"] == "<tag>"
 
     plugins = (web / "js" / "plugins.js").read_text("utf-8")
