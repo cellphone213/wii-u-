@@ -44,6 +44,15 @@ jobs:
           python tools/check_rgss_real.py "$dir\Game.rgss3a" "$dir\Game.rgss2a" "$dir\Game.rgssad"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Real Anim / Crowd script files (decrypted samples documented by FEW_Engine)
+        run: |
+          $base = "https://raw.githubusercontent.com/TheVNConnoisseur/FEW_Engine/bdff8f335d07e9978233ef1a56f314e57106dda1/Investigation"
+          $dir = "$env:RUNNER_TEMP\anim"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          foreach ($f in "zet_sce.dat", "zet_define.dat") { Invoke-WebRequest "$base/$f" -OutFile "$dir\$f" }
+          python tools/check_anim_real.py "$dir\zet_sce.dat" "$dir\zet_define.dat"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Cache bundled tools
         id: tools-cache
         uses: actions/cache@v4
@@ -156,6 +165,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           python -c "import sys; sys.path.insert(0,'.'); from vnarabizer.archives.siglus import ScenePck; p=ScenePck(open(sys.argv[1],'rb').read()); print('\n'.join(s for sc in p.scenes for s in sc.strings))" "$env:RUNNER_TEMP\SgDemo\Scene.pck"
           .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\SgDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Translate a demo Anim / Crowd game (*_sce.dat) end to end
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\AnimDemo" anim
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\AnimDemo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python tools/show_patched.py "$env:RUNNER_TEMP\AnimDemo\zz_sce.dat"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\AnimDemo"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Build installer

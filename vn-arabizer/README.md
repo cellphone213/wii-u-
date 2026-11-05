@@ -22,6 +22,7 @@
 | **RPG Maker VX Ace / VX / XP** (`Game.rgss3a` / `Game.rgss2a` / `Game.rgssad` أو مجلد `Data`) | تلقائي: يفك الأرشيف المشفّر ويعيد بناءه، ويترجم الحوار والاختيارات وقاعدة البيانات ورسائل `Vocab`، ويضيف سكربت للخط العربي ومحاذاة الرسائل لليمين | ✅ |
 | **Siglus** (`Scene.pck` + `Gameexe.dat`) | تلقائي: يستخرج مفتاح اللعبة بأداة siglus-static-key-tool المضمّنة (أو من `siglus_key.txt`) | ✅ |
 | **NScripter** (`nscript.dat` أو `0.txt`) | تلقائي | ✅ |
+| **Anim / Crowd** (SIS Planning) — `*_sce.dat` و`*_define.dat` | تلقائي: يفك تشفير الملف، ويترجم نصوص جدول السلاسل (الحوار والسرد والأسماء)، ويتجاهل أسماء الملفات مثل `BG020`، ويحذف القراءة `＜よみ＞`، ويحافظ على `@n` (سطر جديد)، ثم يعيد التشفير بنفس المفتاح | ✅ |
 | **BGI/Ethornell** (`data01xxx.arc`)، **Majiro** (`.arc`)، **AdvHD** (`Rio.arc`)، **Artemis** (`.pfs`)، **YU-RIS** (`.ypf`)، **Softpal** (`data.pac`)، **Kaguya** (`.dat`) | تلقائي: البرنامج نفسه يفك الأرشيف ويعيد بناءه — **بدون GARbro** | ✅ |
 | Cyberworks، Musica، Mware، Propeller، QLIE، ShSystem، Silky's/AI6WIN، SystemNNN، TmrHiroAdvSystem، Whale | **مجلد سكربتات:** افتح مجلداً فيه سكربتات اللعبة | ✅ |
 | Malie، Circus، Unity، TyranoScript، WOLF RPG، AliceSoft وغيرها | البرنامج يتعرف عليها ويخبرك باسم المحرك وسبب عدم دعمه | قادمة |

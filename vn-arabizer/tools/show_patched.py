@@ -1,6 +1,6 @@
-"""Print the text of a patched CatSystem2 scene.int or KiriKiri patch.xp3 (CI smoke test).
+"""Print the text of a patched CatSystem2 scene.int, KiriKiri patch.xp3 or Anim/Crowd *_sce.dat (CI smoke test).
 
-Usage: python tools/show_patched.py <scene.int | patch.xp3>
+Usage: python tools/show_patched.py <scene.int | patch.xp3 | *_sce.dat>
 """
 
 import re
@@ -26,6 +26,21 @@ if path.suffix.lower() == ".int":
                 decoded = re.sub(r"\\\$(\d+);", lambda m: chr(int(m.group(1))), text)
                 print(f"{e.name} [{typ:02x}] {decoded}")
                 found = found or bool(arabic.search(decoded))
+elif path.name.lower().endswith("_sce.dat"):
+    from vnarabizer.archives.anim import SceScript
+    from vnarabizer.core.sjis_tunnel import SjisTunnel
+    from vnarabizer.engines.anim import AnimEngine
+
+    # The Shift-JIS tunnel table is next to the game exe, or in the work folder when there is no exe.
+    table = path.parent / "sjis_ext.bin"
+    if not table.exists():
+        table = AnimEngine(path.parent).work / "sjis_ext.bin"
+    tunnel = SjisTunnel(table.read_bytes())
+    for i, s in enumerate(SceScript.load(path.read_bytes()).strings):
+        if s:
+            text = tunnel.decode(s)
+            print(f"#{i} {text}")
+            found = found or bool(arabic.search(text))
 else:
     from vnarabizer.archives.xp3 import Xp3Archive
 

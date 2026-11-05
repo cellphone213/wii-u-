@@ -35,6 +35,10 @@ elif kind == "vxace":
     from fake_rgss import make_vxace_game
 
     make_vxace_game(root)
+elif kind == "anim":
+    from fake_anim import make_anim_game
+
+    make_anim_game(root)
 elif kind == "nscripter":
     from fake_jp import make_nscripter_game
 

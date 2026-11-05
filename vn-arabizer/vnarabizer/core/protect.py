@@ -69,7 +69,9 @@ _VNTP_TOKEN = re.compile(
 # page break (\\), line continuation (/), variables ($name %name $1 %1).
 _NSCR_TOKEN = re.compile(r"!s\d*|!sd|!w\d+|!d\d+|#[0-9A-Fa-f]{6}|[@\\/]|[$%][A-Za-z_]\w*|[$%]\d+|\{[^}\n]{1,40}\}")
 
-SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN, "vntp": _VNTP_TOKEN, "nscr": _NSCR_TOKEN}
+# Anim / Crowd (SIS Planning): "@n" is a line break; other @ + letter/digit codes are kept as they are.
+_ANIM_TOKEN = re.compile(r"@[A-Za-z0-9]")
+SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN, "vntp": _VNTP_TOKEN, "nscr": _NSCR_TOKEN, "anim": _ANIM_TOKEN}
 # Twine markup needs a real tokenizer (nested quotes, multi-line macros).
 TWINE = ("sugarcube", "harlowe")
 # Entities our own escaping produces for Twine prose.
@@ -235,6 +237,9 @@ def _escape_prose(s: str, syntax: str = "renpy") -> str:
     if syntax == "nscr":
         s = s.translate(str.maketrans({"@": "＠", "\\": "＼", "/": "／", "#": "＃", "!": "！", "$": "＄", "%": "％", ";": "；", "`": "‘", "{": "｛", "}": "｝"}))
         return re.sub(r"\s*\n\s*", " ", s)
+    if syntax == "anim":
+        s = s.translate(str.maketrans({"@": "＠"}))
+        return re.sub(r"\s*\n\s*", " ", s)
     if syntax == "vntp":
         # Characters that start codes in Japanese engines become full-width look-alikes.
         s = s.translate(str.maketrans({"[": "［", "]": "］", "\\": "＼", "<": "＜", ">": "＞", "{": "｛", "}": "｝"}))
@@ -371,6 +376,7 @@ _WORD_TOKEN: dict = {
     "rpgm": re.compile(r"^\\[NnPpVv]\[\d+\]$|^\\[Gg]$"),
     "vntp": re.compile(r"^\[emb\b"),  # KiriKiri [emb exp=...] prints a value
     "nscr": re.compile(r"^[$%]"),  # variables printed inside the text
+    "anim": re.compile(r"(?!)"),  # @n and the other @ codes print nothing
 }
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 

@@ -321,7 +321,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "محرك غير مدعوم",
-                "لم أتعرف على محرك هذه اللعبة. يدعم البرنامج: Ren'Py، RPG Maker MV/MZ، Twine (HTML)، Siglus، NScripter، CatSystem2، KiriKiri، BGI/Ethornell، Majiro، AdvHD، Artemis، YU-RIS، Softpal، Kaguya، ومجلد سكربتات مستخرجة لمحركات أخرى.\n"
+                "لم أتعرف على محرك هذه اللعبة. يدعم البرنامج: Ren'Py، RPG Maker MV/MZ، Twine (HTML)، Siglus، NScripter، Anim/Crowd، CatSystem2، KiriKiri، BGI/Ethornell، Majiro، AdvHD، Artemis، YU-RIS، Softpal، Kaguya، ومجلد سكربتات مستخرجة لمحركات أخرى.\n"
                 "تأكد أنك اخترت المجلد الرئيسي للعبة (الذي فيه ملف التشغيل).",
             )
             return

@@ -10,6 +10,8 @@
 | [siglus_static_key_tool](https://github.com/xmoezzz/siglus_static_key_tool) (xmoezzz) | Recovers a Siglus game's 16-byte key (bundled, built from source) | MPL-2.0 |
 | [siglus_rs](https://github.com/xmoezzz/siglus_rs) (xmoezzz) | Scene.pck layout and keys (re-implemented in `archives/siglus.py`, also MPL-2.0) | MPL-2.0 |
 | [KirikiriDescrambler](https://github.com/arcusmaximus/KirikiriTools) (arcusmaximus) | KiriKiri FE FE text descrambling (ported to Python) | MIT |
+| [toto](https://github.com/kenkyuuka/toto) (kenkyuuka) | Anim/Crowd `*_sce.dat` / `*_define.dat` encryption (ported to Python in `archives/anim.py`) | MIT |
+| [FEW_Engine](https://github.com/TheVNConnoisseur/FEW_Engine) (TheVNConnoisseur) | Documentation of the `*_sce.dat` layout (sections, strings referenced by index); its decrypted sample files are used in CI tests. No code is copied or bundled. | GPL-3.0 |
 | [RPGMakerDecrypter](https://github.com/uuksu/RPGMakerDecrypter) (uuksu) | Reference for RGSSAD v1/v3; its sample archives are used in CI tests (not bundled) | MIT |
 | [Noto Sans Arabic / Noto Sans](https://fonts.google.com/noto) | Bundled Arabic font | SIL OFL 1.1 |
 | [NLLB-200](https://huggingface.co/facebook/nllb-200-distilled-1.3B) (Meta) | Offline translation model (downloaded by the user) | CC BY-NC 4.0 |

@@ -9,13 +9,14 @@ from .renpy import RenPyEngine
 from .rgss import RGSSEngine
 from .rpgm import RPGMakerEngine
 from .twine import TwineEngine
+from .anim import AnimEngine
 from .nscripter import NScripterEngine
 from .siglus import SiglusEngine
 from .vntp import PACKED_ENGINES, CatSystem2Engine, KiriKiriEngine, ScriptFolderEngine
 
 # Order matters: specific engines first, the generic script folder last.
 ENGINES: list[type[Engine]] = [
-    RenPyEngine, RPGMakerEngine, RGSSEngine, TwineEngine, SiglusEngine, NScripterEngine,
+    RenPyEngine, RPGMakerEngine, RGSSEngine, TwineEngine, SiglusEngine, NScripterEngine, AnimEngine,
     CatSystem2Engine, KiriKiriEngine, *PACKED_ENGINES, ScriptFolderEngine,
 ]
 
