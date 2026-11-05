@@ -85,6 +85,14 @@ class SettingsDialog(QDialog):
         self.fonts.setChecked(settings.replace_fonts)
         for w in (self.align, self.force, self.fonts):
             v3.addWidget(w)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("طول سطر الرسالة في المحركات اليابانية (حروف، 0 = تلقائي):"))
+        self.line_em = QSpinBox()
+        self.line_em.setRange(0, 80)
+        self.line_em.setValue(int(settings.legacy_line_em))
+        self.line_em.setToolTip("CatSystem2 و KiriKiri وغيرها: يُقسَّم النص العربي إلى أسطر بهذا الطول. قلّله إذا خرج النص من النافذة.")
+        row.addWidget(self.line_em)
+        v3.addLayout(row)
         lay.addWidget(g3)
 
         g4 = QGroupBox("الخصوصية")
@@ -110,6 +118,7 @@ class SettingsDialog(QDialog):
         s.align_right = self.align.isChecked()
         s.force_language = self.force.isChecked()
         s.replace_fonts = self.fonts.isChecked()
+        s.legacy_line_em = self.line_em.value()
         s.private_mode = self.private.isChecked()
         s.save()
         super().accept()

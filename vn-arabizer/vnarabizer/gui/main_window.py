@@ -297,6 +297,8 @@ class MainWindow(QMainWindow):
             opts.align_right = self.settings.align_right
             opts.force_language = self.settings.force_language
             opts.replace_fonts = self.settings.replace_fonts
+        if hasattr(eng, "line_em") and self.settings.legacy_line_em:
+            eng.line_em = float(self.settings.legacy_line_em)
 
     # ------------------------------------------------------------------ actions
     def choose_game(self) -> None:
@@ -306,11 +308,13 @@ class MainWindow(QMainWindow):
 
     def open_game(self, path: str) -> None:
         eng = detect(path)
+        if eng is None and Path(path).is_dir():
+            eng = self._ask_script_format(Path(path))
         if eng is None:
             QMessageBox.warning(
                 self,
                 "محرك غير مدعوم",
-                "لم أتعرف على محرك هذه اللعبة. حالياً يدعم البرنامج Ren'Py وRPG Maker MV/MZ وألعاب Twine (HTML)، والمحركات الأخرى قادمة.\n"
+                "لم أتعرف على محرك هذه اللعبة. يدعم البرنامج: Ren'Py، RPG Maker MV/MZ، Twine (HTML)، CatSystem2، KiriKiri، ومجلد سكربتات مستخرجة لمحركات يابانية كثيرة (BGI، Siglus، AdvHD، Majiro، YU-RIS، QLIE...).\n"
                 "تأكد أنك اخترت المجلد الرئيسي للعبة (الذي فيه ملف التشغيل).",
             )
             return
@@ -330,6 +334,24 @@ class MainWindow(QMainWindow):
         self._update_buttons()
         if not self.project.stats()["total"]:
             self.extract()
+
+    def _ask_script_format(self, folder: Path):
+        """Unknown folder: maybe extracted scripts of an engine without a unique file extension."""
+        from PySide6.QtWidgets import QInputDialog
+
+        from ..engines.vntp import ScriptFolderEngine
+        from ..engines.vntp.tool import EXPLICIT_FORMATS
+
+        labels = [f"{label} ({key})" for key, label in EXPLICIT_FORMATS.items()]
+        item, ok = QInputDialog.getItem(
+            self, "مجلد سكربتات؟",
+            "لم أتعرف على المحرك تلقائياً.\nإذا كان هذا مجلد سكربتات مستخرجة (بـ GARbro مثلاً) فاختر محركه:",
+            labels, 0, False,
+        )
+        if not ok:
+            return None
+        key = list(EXPLICIT_FORMATS)[labels.index(item)]
+        return ScriptFolderEngine.detect(folder, key)
 
     def extract(self) -> None:
         eng, project = self.engine, self.project
@@ -419,7 +441,7 @@ class MainWindow(QMainWindow):
 
         def done(files):
             self.log("✓ طُبّق التعريب. الملفات المضافة:\n  " + "\n  ".join(files))
-            if eng.markup in ("rpgm", "sugarcube", "harlowe"):
+            if eng.markup in ("rpgm", "sugarcube", "harlowe", "vntp"):
                 self.log("نُسخت ملفات اللعبة الأصلية إلى مجلد vnarabizer_backup. «إزالة التعريب» يرجعها كما كانت تماماً.")
             else:
                 self.log("ملفات اللعبة الأصلية لم تُعدَّل. للتراجع اضغط «إزالة التعريب».")

@@ -35,6 +35,17 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q tests
 
+      - name: Cache bundled tools
+        id: tools-cache
+        uses: actions/cache@v4
+        with:
+          path: vn-arabizer/vnarabizer/assets/tools
+          key: tools-${{ hashFiles('vn-arabizer/packaging/build_tools.ps1') }}
+
+      - name: Build VNTextPatch, VNTextProxy and KirikiriTools from source
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        run: ./packaging/build_tools.ps1
+
       - name: Build app folder
         run: pyinstaller packaging/vnarabizer.spec --noconfirm
 
@@ -88,6 +99,27 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           python -c "import html,re,sys; d=open(sys.argv[1],encoding='utf-8').read(); print(html.unescape(re.search(r'name=.Start.[^>]*>(.*?)</tw-passagedata>', d, re.S).group(1)))" "$env:RUNNER_TEMP\TwineDemo\Test Game.html"
           .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\TwineDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Translate a demo CatSystem2 game end to end (real VNTextPatch)
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\Cs2Demo" cs2
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\Cs2Demo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python tools/show_patched.py "$env:RUNNER_TEMP\Cs2Demo\scene.int"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-ChildItem "$env:RUNNER_TEMP\Cs2Demo"
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\Cs2Demo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Translate a demo KiriKiri game end to end (real VNTextPatch)
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\KrkrDemo" krkr
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\KrkrDemo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python tools/show_patched.py "$env:RUNNER_TEMP\KrkrDemo\patch.xp3"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\KrkrDemo"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Build installer

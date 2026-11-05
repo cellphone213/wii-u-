@@ -7,3 +7,4 @@ dist/
 *.egg-info/
 .venv/
 vnarabizer/assets/fonts/_tmp/
+vnarabizer/assets/tools/

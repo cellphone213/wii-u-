@@ -2,3 +2,7 @@ PySide6>=6.6
 ctranslate2>=4.4
 sentencepiece>=0.2
 certifi
+pycryptodome>=3.20
+pefile>=2023.2.7
+arabic-reshaper>=3.0
+python-bidi>=0.6

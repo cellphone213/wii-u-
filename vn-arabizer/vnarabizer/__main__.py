@@ -32,6 +32,8 @@ def _cli(argv: list[str]) -> int:
         p = sub.add_parser(name)
         p.add_argument("game")
         p.add_argument("--private", action="store_true", help="keep nothing on disk (translate+apply in one run)")
+        p.add_argument("--format", default=None, help="VNTextPatch format for extracted script folders (ethornell, reallive, whale, ...)")
+        p.add_argument("--line-width", type=float, default=0, help="Japanese engines: message line width in full-width characters")
         if name == "translate":
             p.add_argument("--engine", default="nllb", choices=list(TRANSLATORS))
             p.add_argument("--source", default="auto")
@@ -58,6 +60,15 @@ def _cli(argv: list[str]) -> int:
         print("ctranslate2", ctranslate2.__version__, "cuda devices:", ctranslate2.get_cuda_device_count())
         print("sentencepiece", sentencepiece.__version__)
         print("fonts", sorted(p.name for p in (assets_dir() / "fonts").iterdir()))
+        from .engines.vntp import tool
+
+        for label, getter in (("VNTextPatch", tool.vntextpatch), ("VNTextProxy d2d1", lambda: tool.proxy_dll("d2d1")),
+                              ("KirikiriUnencryptedArchive", tool.kirikiri_unencrypted_dll)):
+            try:
+                print(label, getter().stat().st_size, "bytes")
+            except tool.ToolMissing as e:
+                print(label, "MISSING:", e)
+        import arabic_reshaper, bidi  # noqa: F401  (bundled for Japanese engines)
         return 0
 
     if a.cmd == "download-model":
@@ -86,7 +97,14 @@ def _cli(argv: list[str]) -> int:
         print("device:", tr.device)
         return 0
 
-    eng = detect(a.game)
+    if a.format:
+        from .engines.vntp import ScriptFolderEngine
+
+        eng = ScriptFolderEngine.detect(a.game, a.format)
+    else:
+        eng = detect(a.game)
+    if eng is not None and a.line_width and hasattr(eng, "line_em"):
+        eng.line_em = a.line_width
     if eng is None:
         print("unsupported or unrecognised game", file=sys.stderr)
         return 2
@@ -100,7 +118,7 @@ def _cli(argv: list[str]) -> int:
     if a.cmd in ("extract", "translate") or not project.stats()["total"]:
         added, total = project.merge_entries(eng.extract())
         print(f"{total} lines ({added} new)")
-        for w in eng.warnings:
+        for w in getattr(eng, "warnings", []):
             print("warning:", w)
     if a.cmd == "translate":
         cls = TRANSLATORS[a.engine]
@@ -114,6 +132,8 @@ def _cli(argv: list[str]) -> int:
     if a.cmd == "apply" or (a.cmd == "translate" and a.apply):
         files = eng.apply(project.translations())
         print("written:", *files, sep="\n  ")
+        for w in getattr(eng, "warnings", []):
+            print("warning:", w)
     project.close()
     return 0
 

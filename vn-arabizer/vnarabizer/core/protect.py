@@ -48,7 +48,22 @@ _RPGM_TOKEN = re.compile(
     re.VERBOSE,
 )
 
-SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN}
+# Codes in text extracted by VNTextPatch from Japanese engines: KiriKiri tags
+# ([ruby text=...], [emb exp=...]), CatSystem2 escapes (\\fs, \\@, \\$12345;),
+# angle-bracket and brace codes used by several engines.
+_VNTP_TOKEN = re.compile(
+    r"""
+      \[[^\[\]\n]{1,80}\]
+    | \\[A-Za-z]+\[[^\]\n]*\]
+    | \\\$\d+;
+    | \\[A-Za-z@]+
+    | <[^<>\n]{1,60}>
+    | \{[^{}\n]{1,60}\}
+    """,
+    re.VERBOSE,
+)
+
+SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN, "vntp": _VNTP_TOKEN}
 # Twine markup needs a real tokenizer (nested quotes, multi-line macros).
 TWINE = ("sugarcube", "harlowe")
 # Entities our own escaping produces for Twine prose.
@@ -161,8 +176,8 @@ class Masked:
 def mask(text: str, syntax: str = "renpy") -> Masked:
     """Split ``text`` into verbatim edges and a placeholder-marked body."""
     original = text
-    if syntax == "rpgm":
-        text = _join_lines(text)
+    if syntax in ("rpgm", "vntp"):
+        text = _join_lines(text.replace("\r\n", "\n"))
     pieces: list[tuple[bool, str]] = []  # (is_token, text)
     pos = 0
     for a, b in token_spans(text, syntax):
@@ -211,6 +226,10 @@ def _escape_prose(s: str, syntax: str = "renpy") -> str:
         from . import twine_markup
 
         return twine_markup.escape_prose(s)
+    if syntax == "vntp":
+        # Characters that start codes in Japanese engines become full-width look-alikes.
+        s = s.translate(str.maketrans({"[": "［", "]": "］", "\\": "＼", "<": "＜", ">": "＞", "{": "｛", "}": "｝"}))
+        return re.sub(r"\s*\n\s*", " ", s)
     if syntax == "rpgm":
         # A stray backslash would start an escape code; "\\" shows one backslash.
         s = s.replace("\\", "\\\\")
@@ -341,6 +360,7 @@ def arabic_punct(s: str) -> str:
 _WORD_TOKEN: dict = {
     "renpy": re.compile(r"^\[[^\[\]]+\]$|^%\(\w+\)[sd]$|^%[sd]$"),
     "rpgm": re.compile(r"^\\[NnPpVv]\[\d+\]$|^\\[Gg]$"),
+    "vntp": re.compile(r"^\[emb\b"),  # KiriKiri [emb exp=...] prints a value
 }
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 

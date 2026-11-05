@@ -23,6 +23,8 @@ class Settings:
     align_right: bool = True
     force_language: bool = True
     replace_fonts: bool = True
+    # Japanese engines: message width in full-width characters (0 = engine default).
+    legacy_line_em: float = 0
     last_game: str = ""
 
     @classmethod
