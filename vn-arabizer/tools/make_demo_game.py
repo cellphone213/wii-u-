@@ -31,6 +31,18 @@ elif kind == "krkr":
     from fake_vn import make_kirikiri_game
 
     make_kirikiri_game(root)
+elif kind == "vxace":
+    from fake_rgss import make_vxace_game
+
+    make_vxace_game(root)
+elif kind == "nscripter":
+    from fake_jp import make_nscripter_game
+
+    make_nscripter_game(root)
+elif kind == "siglus":
+    from fake_jp import make_siglus_game
+
+    make_siglus_game(root, encrypted=False)
 else:
     from fake_twine import make_twine
 

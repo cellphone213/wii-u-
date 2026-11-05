@@ -7,13 +7,13 @@ KirikiriUnencryptedArchive (version.dll) so the unencrypted patch is also
 accepted by games with encrypted archives. KiriKiri stores text as UTF-16,
 so Arabic needs no Shift-JIS workaround; VNTextProxy supplies the font.
 
-Encrypted archives (per-game schemes) cannot be unpacked here: extract the
-scenario files with GARbro and open the extracted folder instead.
+Scrambled text files (FE FE header) are descrambled automatically.
+Archives encrypted with a per-game scheme cannot be read without the game's
+own code: dump the scenario files while the game runs and open that folder.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from ...archives.xp3 import Xp3Archive, Xp3Error, write_xp3
@@ -24,13 +24,43 @@ from .base import VNTPEngine, safe_name
 SCRIPT_EXT = (".ks", ".scn")
 
 
+def descramble(data: bytes) -> bytes:
+    """KiriKiri "simple crypt" text (FE FE mode FF FE) -> plain UTF-16LE with BOM.
+
+    Port of KirikiriDescrambler (arcusmaximus, MIT). The engine reads the
+    plain text just as well, so patched files are written unscrambled.
+    """
+    if data[:2] != b"\xfe\xfe" or data[3:5] != b"\xff\xfe":
+        return data
+    mode, body = data[2], bytearray(data[5:])
+    if mode == 0:
+        for i in range(0, len(body) - 1, 2):
+            if body[i + 1] == 0 and body[i] < 0x20:
+                continue
+            body[i + 1] ^= body[i] & 0xFE
+            body[i] ^= 1
+    elif mode == 1:
+        for i in range(0, len(body) - 1, 2):
+            c = body[i] | (body[i + 1] << 8)
+            c = ((c & 0xAAAA) >> 1) | ((c & 0x5555) << 1)
+            body[i], body[i + 1] = c & 0xFF, c >> 8
+    elif mode == 2:
+        import zlib
+
+        size = int.from_bytes(body[8:16], "little")
+        body = bytearray(zlib.decompressobj().decompress(bytes(body[16:]))[:size])
+    else:
+        raise ValueError(f"unknown KiriKiri scrambling mode {mode}")
+    return b"\xff\xfe" + bytes(body)
+
+
 def _looks_like_script(name: str, data: bytes) -> bool:
     if name.lower().endswith(".scn"):
         return data[:4] in (b"PSB\x00", b"mdf\x00")
     if data[:2] in (b"\xff\xfe", b"\xfe\xff") or data[:3] == b"\xef\xbb\xbf":
         return True
     if data[:5] in (b"\xfe\xfe\x00\xff\xfe", b"\xfe\xfe\x01\xff\xfe", b"\xfe\xfe\x02\xff\xfe"):
-        return False  # scrambled: needs KirikiriDescrambler
+        return True  # scrambled: descrambled when staged
     try:
         data[:4096].decode("cp932")
         return True
@@ -86,6 +116,8 @@ class KiriKiriEngine(VNTPEngine):
                     continue
                 try:
                     data = arc.read(e)
+                    if data[:2] == b"\xfe\xfe":
+                        data = descramble(data)
                 except Exception as err:
                     problems.append(f"{arc_path.name}: {base}: {err}")
                     continue
@@ -98,7 +130,8 @@ class KiriKiriEngine(VNTPEngine):
         if not found:
             raise RuntimeError(
                 "No readable KiriKiri scenario files. This game's archives are probably encrypted: "
-                "extract the .ks/.scn files with GARbro (or KirikiriTools), then open the extracted folder in VN Arabizer.\n"
+                "this needs the game's own decryption (dump the .ks/.scn files while the game runs, e.g. with KrkrDump), "
+                "then open the dumped folder in VN Arabizer.\n"
                 + "\n".join(problems[:5])
             )
         self.warnings += problems[:20]

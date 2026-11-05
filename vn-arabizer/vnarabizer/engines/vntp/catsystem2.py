@@ -72,7 +72,7 @@ class CatSystem2Engine(VNTPEngine):
         except KifError as e:
             raise RuntimeError(
                 f"Cannot open {self.scene.name}: {e}. If the game's key is not in its .exe, "
-                "extract the .cst files with GARbro and open that folder instead."
+                "put the extracted .cst files in a folder and open that folder instead."
             ) from e
 
     def stage_scripts(self, dest: Path) -> None:

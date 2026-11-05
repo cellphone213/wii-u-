@@ -35,6 +35,15 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q tests
 
+      - name: Real RPG Maker XP / VX / VX Ace archives (sample projects from RPGMakerDecrypter, MIT)
+        run: |
+          $base = "https://raw.githubusercontent.com/uuksu/RPGMakerDecrypter/465c88c304cac0b1516a3fbfb0b2a87fb0517736/RPGMakerDecrypter.Tests/EncryptedArchives"
+          $dir = "$env:RUNNER_TEMP\rgss"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          foreach ($f in "Game.rgss3a", "Game.rgss2a", "Game.rgssad") { Invoke-WebRequest "$base/$f" -OutFile "$dir\$f" }
+          python tools/check_rgss_real.py "$dir\Game.rgss3a" "$dir\Game.rgss2a" "$dir\Game.rgssad"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Cache bundled tools
         id: tools-cache
         uses: actions/cache@v4
@@ -50,7 +59,10 @@ jobs:
         run: pyinstaller packaging/vnarabizer.spec --noconfirm
 
       - name: Self-test of the built app
-        run: .\dist\VNArabizer\vnarabizer-cli.exe selftest
+        run: |
+          .\dist\VNArabizer\vnarabizer-cli.exe selftest | Tee-Object -Variable st
+          if ($LASTEXITCODE -ne 0 -or ($st -match "MISSING")) { exit 1 }
+          Get-Item vnarabizer\assets\tools\SiglusKey\siglus-static-key-tool.exe
 
       - name: Cache offline model
         uses: actions/cache@v4
@@ -120,6 +132,30 @@ jobs:
           python tools/show_patched.py "$env:RUNNER_TEMP\KrkrDemo\patch.xp3"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\KrkrDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Translate a demo RPG Maker VX Ace game (Game.rgss3a) end to end
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\VxaDemo" vxace
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\VxaDemo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python -c "import sys; sys.path.insert(0,'.'); from vnarabizer.archives.rgss import RgssArchive; from vnarabizer.archives.rmarshal import loads; a=RgssArchive(sys.argv[1]); m=loads(a.read('Data/Map001.rvdata2')); print('\n'.join(c.get('@parameters').items[0].text for c in m.get('@events').pairs[0][1].get('@pages').items[0].get('@list').items if c.get('@code')==401))" "$env:RUNNER_TEMP\VxaDemo\Game.rgss3a"
+          if (-not (Test-Path "$env:RUNNER_TEMP\VxaDemo\Fonts\VN Arabic.ttf")) { exit 1 }
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\VxaDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Translate demo NScripter (nscript.dat) and Siglus (Scene.pck) games end to end
+        run: |
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\NsDemo" nscripter
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\NsDemo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\NsDemo"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python tools/make_demo_game.py "$env:RUNNER_TEMP\SgDemo" siglus
+          .\dist\VNArabizer\vnarabizer-cli.exe translate "$env:RUNNER_TEMP\SgDemo" --engine nllb --model nllb-600m --source ja --apply
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python -c "import sys; sys.path.insert(0,'.'); from vnarabizer.archives.siglus import ScenePck; p=ScenePck(open(sys.argv[1],'rb').read()); print('\n'.join(s for sc in p.scenes for s in sc.strings))" "$env:RUNNER_TEMP\SgDemo\Scene.pck"
+          .\dist\VNArabizer\vnarabizer-cli.exe remove "$env:RUNNER_TEMP\SgDemo"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Build installer

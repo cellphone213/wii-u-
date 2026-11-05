@@ -4,10 +4,13 @@
 #
 #   VNTextPatch, VNTextProxy  - arcusmaximus/VNTranslationTools (MIT)
 #   KirikiriUnencryptedArchive - arcusmaximus/KirikiriTools (MIT)
+#   siglus-static-key-tool     - xmoezzz/siglus_static_key_tool (MPL-2.0), needs Rust (cargo)
 
 $ErrorActionPreference = "Stop"
 $VNTT_COMMIT = "36fbe909d02f2e9bb187443e03e2df595f56bfec"
 $KRKR_COMMIT = "9590c3cce4733e1f048cd407bfb57e8ce71f1f95"
+$SIGKEY_COMMIT = "d1bcd97862a24b511217e3ea930599ed99e0a053"
+$SIGLUS_RS_COMMIT = "5f358ef1360b0439e92aed2b749e8f25d8721954"  # only for the MPL-2.0 licence text
 
 $out = Join-Path (Get-Location) "vnarabizer\assets\tools"
 $work = Join-Path $env:RUNNER_TEMP "tool-src"
@@ -74,9 +77,19 @@ $versionDll = Get-ChildItem -Recurse -Filter version.dll | Select-Object -First 
 if (-not $versionDll) { throw "version.dll not produced" }
 Pop-Location
 
+# ---- siglus-static-key-tool -------------------------------------------------------
+$sigkey = Join-Path $work "siglus_static_key_tool"
+Clone "https://github.com/xmoezzz/siglus_static_key_tool" $SIGKEY_COMMIT $sigkey
+Push-Location $sigkey
+cargo build --release --locked
+if ($LASTEXITCODE -ne 0) { throw "siglus-static-key-tool build failed" }
+Pop-Location
+$mpl = Join-Path $work "MPL-2.0.txt"
+Invoke-WebRequest "https://raw.githubusercontent.com/xmoezzz/siglus_rs/$SIGLUS_RS_COMMIT/LICENSE-MPL-2.0" -OutFile $mpl
+
 # ---- copy into the app -------------------------------------------------------------
 Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path "$out\VNTextPatch", "$out\VNTextProxy", "$out\KirikiriTools" | Out-Null
+New-Item -ItemType Directory -Force -Path "$out\VNTextPatch", "$out\VNTextProxy", "$out\KirikiriTools", "$out\SiglusKey" | Out-Null
 Copy-Item -Recurse "$vntt\Build\VNTextPatch\*" "$out\VNTextPatch\"
 Copy-Item "$vntt\Build\VNTextProxy\*.dll" "$out\VNTextProxy\"
 Copy-Item "$vntt\LICENSE" "$out\VNTextPatch\LICENSE-VNTranslationTools.txt"
@@ -84,4 +97,7 @@ Copy-Item "$vntt\LICENSE" "$out\VNTextProxy\LICENSE-VNTranslationTools.txt"
 Copy-Item "$vntt\external\FreeMote\LICENSE*" "$out\VNTextPatch\" -ErrorAction SilentlyContinue
 Copy-Item $versionDll.FullName "$out\KirikiriTools\version.dll"
 Copy-Item "$krkr\LICENSE" "$out\KirikiriTools\LICENSE-KirikiriTools.txt"
+Copy-Item "$sigkey\target\release\siglus-static-key-tool.exe" "$out\SiglusKey\"
+Copy-Item $mpl "$out\SiglusKey\LICENSE-MPL-2.0.txt"
+"Source: https://github.com/xmoezzz/siglus_static_key_tool/tree/$SIGKEY_COMMIT (MPL-2.0)" | Set-Content "$out\SiglusKey\SOURCE.txt"
 Get-ChildItem -Recurse $out | Select-Object FullName, Length | Format-Table -AutoSize

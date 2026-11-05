@@ -308,13 +308,20 @@ class MainWindow(QMainWindow):
 
     def open_game(self, path: str) -> None:
         eng = detect(path)
+        if eng is None:
+            from ..engines.identify import identify
+
+            known = identify(Path(path))
+            if known is not None and known[0] != "محرك يستخدم ملفات .dat":
+                QMessageBox.warning(self, "محرك غير مدعوم", f"المحرك: {known[0]}\n\n{known[1]}")
+                return
         if eng is None and Path(path).is_dir():
             eng = self._ask_script_format(Path(path))
         if eng is None:
             QMessageBox.warning(
                 self,
                 "محرك غير مدعوم",
-                "لم أتعرف على محرك هذه اللعبة. يدعم البرنامج: Ren'Py، RPG Maker MV/MZ، Twine (HTML)، CatSystem2، KiriKiri، ومجلد سكربتات مستخرجة لمحركات يابانية كثيرة (BGI، Siglus، AdvHD، Majiro، YU-RIS، QLIE...).\n"
+                "لم أتعرف على محرك هذه اللعبة. يدعم البرنامج: Ren'Py، RPG Maker MV/MZ، Twine (HTML)، Siglus، NScripter، CatSystem2، KiriKiri، BGI/Ethornell، Majiro، AdvHD، Artemis، YU-RIS، Softpal، Kaguya، ومجلد سكربتات مستخرجة لمحركات أخرى.\n"
                 "تأكد أنك اخترت المجلد الرئيسي للعبة (الذي فيه ملف التشغيل).",
             )
             return
@@ -345,7 +352,7 @@ class MainWindow(QMainWindow):
         labels = [f"{label} ({key})" for key, label in EXPLICIT_FORMATS.items()]
         item, ok = QInputDialog.getItem(
             self, "مجلد سكربتات؟",
-            "لم أتعرف على المحرك تلقائياً.\nإذا كان هذا مجلد سكربتات مستخرجة (بـ GARbro مثلاً) فاختر محركه:",
+            "لم أتعرف على المحرك تلقائياً.\nإذا كان هذا مجلد سكربتات مستخرجة من لعبة فاختر محركه:",
             labels, 0, False,
         )
         if not ok:

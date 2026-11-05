@@ -1,12 +1,12 @@
 """A folder of extracted script files from any engine VNTextPatch supports.
 
-For engines whose archives VN Arabizer cannot pack itself (BGI/Ethornell,
-Siglus/RealLive, AdvHD, Majiro, YU-RIS, QLIE, Softpal, Artemis, Silky's,
-encrypted KiriKiri...): extract the scenario files with GARbro, open that
-folder here, and VN Arabizer writes the translated scripts to
-``<folder> (Arabic)``. Put them back with GARbro (or the engine's own
-loose-file override), and copy the files in ``_put_next_to_game_exe``
-next to the game's .exe.
+Most games are opened directly (their archives are unpacked and rebuilt by
+VN Arabizer itself). This mode is for the rest: a folder of script files
+already taken out of the game (QLIE, Silky's, Musica, Propeller, SystemNNN,
+dumped encrypted KiriKiri...). VN Arabizer writes the translated scripts to
+``<folder> (Arabic)``; put them back with the engine's loose-file override
+or a packer, and copy the files in ``_put_next_to_game_exe`` next to the
+game's .exe.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ class ScriptFolderEngine(VNTPEngine):
         proxy = tool.choose_proxy(exe) if exe else None
         (runtime / "README.txt").write_text(
             "VN Arabizer\n\n"
-            "1. Pack the translated scripts from the parent folder back into the game (for example with GARbro).\n"
+            "1. Put the translated scripts back into the game (loose-file override or the engine's packer).\n"
             "2. Copy 'VN Arabic.ttf'" + (", 'sjis_ext.bin'" if (runtime / "sjis_ext.bin").exists() else "")
             + " and ONE proxy DLL next to the game's .exe.\n"
             + (f"   For {exe.name} use: {proxy}.dll\n" if proxy else "   Use a DLL whose name the game's .exe imports (d2d1, winmm, version...).\n"),

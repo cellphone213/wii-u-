@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 
 def _cli(argv: list[str]) -> int:
@@ -63,7 +64,8 @@ def _cli(argv: list[str]) -> int:
         from .engines.vntp import tool
 
         for label, getter in (("VNTextPatch", tool.vntextpatch), ("VNTextProxy d2d1", lambda: tool.proxy_dll("d2d1")),
-                              ("KirikiriUnencryptedArchive", tool.kirikiri_unencrypted_dll)):
+                              ("KirikiriUnencryptedArchive", tool.kirikiri_unencrypted_dll),
+                              ("siglus-static-key-tool", lambda: __import__("vnarabizer.engines.siglus", fromlist=["_key_tool"])._key_tool())):
             try:
                 print(label, getter().stat().st_size, "bytes")
             except tool.ToolMissing as e:
@@ -106,7 +108,13 @@ def _cli(argv: list[str]) -> int:
     if eng is not None and a.line_width and hasattr(eng, "line_em"):
         eng.line_em = a.line_width
     if eng is None:
-        print("unsupported or unrecognised game", file=sys.stderr)
+        from .engines.identify import identify
+
+        known = identify(Path(a.game))
+        if known:
+            print(f"unsupported game engine: {known[0]} - {known[1]}", file=sys.stderr)
+        else:
+            print("unsupported or unrecognised game", file=sys.stderr)
         return 2
     print(f"{eng.root.name}: {eng.describe()}")
     if a.cmd == "remove":

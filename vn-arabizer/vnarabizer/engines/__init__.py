@@ -6,12 +6,18 @@ from pathlib import Path
 
 from .base import Engine, Entry
 from .renpy import RenPyEngine
+from .rgss import RGSSEngine
 from .rpgm import RPGMakerEngine
 from .twine import TwineEngine
-from .vntp import CatSystem2Engine, KiriKiriEngine, ScriptFolderEngine
+from .nscripter import NScripterEngine
+from .siglus import SiglusEngine
+from .vntp import PACKED_ENGINES, CatSystem2Engine, KiriKiriEngine, ScriptFolderEngine
 
 # Order matters: specific engines first, the generic script folder last.
-ENGINES: list[type[Engine]] = [RenPyEngine, RPGMakerEngine, TwineEngine, CatSystem2Engine, KiriKiriEngine, ScriptFolderEngine]
+ENGINES: list[type[Engine]] = [
+    RenPyEngine, RPGMakerEngine, RGSSEngine, TwineEngine, SiglusEngine, NScripterEngine,
+    CatSystem2Engine, KiriKiriEngine, *PACKED_ENGINES, ScriptFolderEngine,
+]
 
 
 def detect(path: str | Path) -> Engine | None:

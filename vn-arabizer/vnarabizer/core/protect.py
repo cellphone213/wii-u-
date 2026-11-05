@@ -43,6 +43,8 @@ _RPGM_TOKEN = re.compile(
     | \\[A-Za-z]+                         # \G and other letter codes
     | \\[$.|^!><{}\\]                     # \. \| \! \> \< \^ \{ \} \\ \$
     | <[A-Za-z/!][^<>\n]{0,60}>            # plugin tags such as <WordWrap>, <br>
+    | %\d+\$[sd]                            # %1$s (RPG Maker VX Ace Vocab, numbered by VN Arabizer)
+    | %[sd]                                # %s
     | %\d+                                 # %1 in system messages
     """,
     re.VERBOSE,
@@ -63,7 +65,11 @@ _VNTP_TOKEN = re.compile(
     re.VERBOSE,
 )
 
-SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN, "vntp": _VNTP_TOKEN}
+# NScripter text-line codes: waits (!s !w !d), colours (#RRGGBB), click wait (@),
+# page break (\\), line continuation (/), variables ($name %name $1 %1).
+_NSCR_TOKEN = re.compile(r"!s\d*|!sd|!w\d+|!d\d+|#[0-9A-Fa-f]{6}|[@\\/]|[$%][A-Za-z_]\w*|[$%]\d+|\{[^}\n]{1,40}\}")
+
+SYNTAXES = {"renpy": _RENPY_TOKEN, "rpgm": _RPGM_TOKEN, "vntp": _VNTP_TOKEN, "nscr": _NSCR_TOKEN}
 # Twine markup needs a real tokenizer (nested quotes, multi-line macros).
 TWINE = ("sugarcube", "harlowe")
 # Entities our own escaping produces for Twine prose.
@@ -226,6 +232,9 @@ def _escape_prose(s: str, syntax: str = "renpy") -> str:
         from . import twine_markup
 
         return twine_markup.escape_prose(s)
+    if syntax == "nscr":
+        s = s.translate(str.maketrans({"@": "＠", "\\": "＼", "/": "／", "#": "＃", "!": "！", "$": "＄", "%": "％", ";": "；", "`": "‘", "{": "｛", "}": "｝"}))
+        return re.sub(r"\s*\n\s*", " ", s)
     if syntax == "vntp":
         # Characters that start codes in Japanese engines become full-width look-alikes.
         s = s.translate(str.maketrans({"[": "［", "]": "］", "\\": "＼", "<": "＜", ">": "＞", "{": "｛", "}": "｝"}))
@@ -361,6 +370,7 @@ _WORD_TOKEN: dict = {
     "renpy": re.compile(r"^\[[^\[\]]+\]$|^%\(\w+\)[sd]$|^%[sd]$"),
     "rpgm": re.compile(r"^\\[NnPpVv]\[\d+\]$|^\\[Gg]$"),
     "vntp": re.compile(r"^\[emb\b"),  # KiriKiri [emb exp=...] prints a value
+    "nscr": re.compile(r"^[$%]"),  # variables printed inside the text
 }
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 
