@@ -62,6 +62,12 @@ Set-Content -Path $config -Value $xml -Encoding utf8
 $krkr = Join-Path $work "KirikiriTools"
 Clone "https://github.com/arcusmaximus/KirikiriTools" $KRKR_COMMIT $krkr
 Push-Location $krkr
+# The C++17 compiler rejects the old 'register' keyword (it never had any effect): drop it.
+Get-ChildItem -Recurse -Include *.h, *.cpp KirikiriUnencryptedArchive | ForEach-Object {
+    $src = Get-Content $_.FullName -Raw
+    $fixed = $src -replace '\bregister\s+', ''
+    if ($fixed -ne $src) { Set-Content -Path $_.FullName -Value $fixed -NoNewline }
+}
 & $msbuild KirikiriUnencryptedArchive\KirikiriUnencryptedArchive.vcxproj /v:m /p:Platform=Win32 /p:Configuration=Release /p:PlatformToolset=v143 "/p:SolutionDir=$krkr\"
 if ($LASTEXITCODE -ne 0) { throw "KirikiriUnencryptedArchive build failed" }
 $versionDll = Get-ChildItem -Recurse -Filter version.dll | Select-Object -First 1
